@@ -1,0 +1,73 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0099cc"
+    tools:context="com.ianzieg.markovseq.MainActivity">
+
+    <!-- The primary full-screen view. This can be replaced with whatever view
+         is needed to present your content, e.g. VideoView, SurfaceView,
+         TextureView, etc. -->
+
+    <!-- This FrameLayout insets its children based on system windows using
+         android:fitsSystemWindows. -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="633dp"
+        android:fitsSystemWindows="true">
+
+        <LinearLayout
+            android:id="@+id/midi_device_toolbar"
+            style="?metaButtonBarStyle"
+            android:layout_width="match_parent"
+            android:layout_height="82dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:background="@color/black_overlay"
+            android:orientation="horizontal"
+            tools:ignore="UselessParent"
+            android:weightSum="1">
+
+            <Spinner
+                android:layout_width="312dp"
+                android:layout_height="match_parent"
+                android:id="@+id/midiDeviceSpinner"
+                android:layout_weight="0.51" />
+
+            <Spinner
+                android:layout_width="312dp"
+                android:layout_height="match_parent"
+                android:id="@+id/channelSelect"
+                android:layout_weight="0.51" />
+
+            <Button
+                android:id="@+id/openDeviceButton"
+                style="?metaButtonBarButtonStyle"
+                android:layout_width="312dp"
+                android:layout_height="match_parent"
+                android:text="@string/openDeviceButton" />
+
+            <Button
+                android:id="@+id/playNoteButton"
+                style="?metaButtonBarButtonStyle"
+                android:layout_width="312dp"
+                android:layout_height="match_parent"
+                android:text="@string/playNoteButton" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/fullscreen_content"
+            android:layout_width="match_parent"
+            android:layout_height="364dp"
+            android:gravity="center"
+            android:keepScreenOn="true"
+            android:text="@string/dummy_content"
+            android:background="#ff3abb"
+            android:textColor="#33b5e5"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+
+    </FrameLayout>
+
+</FrameLayout>

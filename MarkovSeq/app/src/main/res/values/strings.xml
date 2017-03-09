@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">MarkovSeq</string>
+
+    <string name="openDeviceButton">Open Device</string>
+    <string name="playNoteButton">Play Note</string>
+    <string name="dummy_content">DUMMY\nCONTENT</string>
+</resources>
