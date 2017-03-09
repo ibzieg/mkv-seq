@@ -39,12 +39,12 @@
                 android:id="@+id/channelSelect"
                 android:layout_weight="0.51" />
 
-            <Button
+     <!--       <Button
                 android:id="@+id/openDeviceButton"
                 style="?metaButtonBarButtonStyle"
                 android:layout_width="312dp"
                 android:layout_height="match_parent"
-                android:text="@string/openDeviceButton" />
+                android:text="@string/openInputDeviceButton" />-->
 
             <Button
                 android:id="@+id/playNoteButton"
@@ -52,6 +52,35 @@
                 android:layout_width="312dp"
                 android:layout_height="match_parent"
                 android:text="@string/playNoteButton" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/midi_output_device_toolbar"
+            style="?metaButtonBarStyle"
+            android:layout_width="match_parent"
+            android:layout_height="82dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="84dp"
+            android:background="@color/black_overlay"
+            android:orientation="horizontal"
+            tools:ignore="UselessParent"
+            android:weightSum="1">
+
+            <Spinner
+                android:layout_width="312dp"
+                android:layout_height="match_parent"
+                android:id="@+id/midiOutputDeviceSpinner"
+                android:layout_weight="0.51" />
+
+         <!--   <Button
+                android:id="@+id/openOutputDeviceButton"
+                style="?metaButtonBarButtonStyle"
+                android:layout_width="312dp"
+                android:layout_height="match_parent"
+                android:text="@string/openOutputDeviceButton" />-->
+
+
 
         </LinearLayout>
 

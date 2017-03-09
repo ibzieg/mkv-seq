@@ -7,6 +7,8 @@ import android.media.midi.MidiDevice;
 import android.media.midi.MidiDeviceInfo;
 import android.media.midi.MidiInputPort;
 import android.media.midi.MidiManager;
+import android.media.midi.MidiOutputPort;
+import android.media.midi.MidiReceiver;
 import android.os.Looper;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
@@ -16,10 +18,10 @@ import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.Spinner;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.IOException;
@@ -31,6 +33,9 @@ import java.util.HashMap;
  * status bar and navigation/system bar) with user interaction.
  */
 public class MainActivity extends AppCompatActivity {
+
+    final String LOG_TAG = "MarkovSeq";
+
     /**
      * Whether or not the system UI should be auto-hidden after
      * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
@@ -143,11 +148,111 @@ public class MainActivity extends AppCompatActivity {
         // Upon interacting with UI controls, delay any scheduled hide()
         // operations to prevent the jarring behavior of controls going away
         // while interacting with the UI.
-        findViewById(R.id.openDeviceButton).setOnTouchListener(mDelayHideTouchListener);
+        //findViewById(R.id.openDeviceButton).setOnTouchListener(mDelayHideTouchListener);
     }
 
-    protected MidiDevice _activeMidiDevice;
-    protected MidiInputPort _activeInputPort;
+    protected MidiDevice _activeMidiInputDevice;
+    protected MidiDevice _activeMidiOutputDevice;
+    protected MidiInputPort _activeMidiInputPort;
+    protected MidiOutputPort _activeMidiOutputPort;
+
+    protected void closeMidiInputConnection() {
+        if (_activeMidiInputPort != null) {
+            try {
+                _activeMidiInputPort.close();
+            } catch (Exception ex) {
+                Log.e(LOG_TAG, "Failed to close midi port: "+ex);
+            }
+        }
+        if (_activeMidiInputDevice != null) {
+            try {
+                _activeMidiInputDevice.close();
+            } catch (Exception ex) {
+                Log.e(LOG_TAG, "Failed to close midi device: "+ex);
+            }
+        }
+    }
+
+    protected void openMidiInputConnection(final MidiPortAddress portAddress) {
+        MidiManager manager = (MidiManager) getSystemService(Context.MIDI_SERVICE);
+        MidiDeviceInfo[] deviceList = manager.getDevices();
+        MidiDeviceInfo deviceInfo = deviceList[portAddress.deviceIndex];
+        manager.openDevice(deviceInfo, new MidiManager.OnDeviceOpenedListener() {
+            @Override
+            public void onDeviceOpened(MidiDevice device) {
+                _activeMidiInputDevice = device;
+                if (device == null) {
+                    Log.e(LOG_TAG, "could not open device " + device);
+                    _activeMidiInputPort = null;
+                } else {
+                    Log.i(LOG_TAG, "opened device: " + device);
+                    _activeMidiInputPort = device.openInputPort(portAddress.portIndex);
+                }
+            }
+
+        }, new Handler(Looper.getMainLooper()));
+    }
+
+    protected void closeMidiOutputConnection() {
+        if (_activeMidiOutputPort != null) {
+            try {
+                _activeMidiOutputPort.close();
+            } catch (Exception ex) {
+                Log.e(LOG_TAG, "Failed to close midi port: "+ex);
+            }
+        }
+        if (_activeMidiOutputDevice != null) {
+            try {
+                _activeMidiOutputDevice.close();
+            } catch (Exception ex) {
+                Log.e(LOG_TAG, "Failed to close midi device: "+ex);
+            }
+        }
+    }
+
+    protected void openMidiOutputConnection(final MidiPortAddress portAddress) {
+        MidiManager manager = (MidiManager) getSystemService(Context.MIDI_SERVICE);
+        MidiDeviceInfo[] deviceList = manager.getDevices();
+        MidiDeviceInfo deviceInfo = deviceList[portAddress.deviceIndex];
+        manager.openDevice(deviceInfo, new MidiManager.OnDeviceOpenedListener() {
+            @Override
+            public void onDeviceOpened(MidiDevice device) {
+                _activeMidiOutputDevice = device;
+                if (device == null) {
+                    Log.e(LOG_TAG, "could not open device " + device);
+                    _activeMidiOutputPort = null;
+                } else {
+                    Log.i(LOG_TAG, "opened device: " + device);
+                    _activeMidiOutputPort = device.openOutputPort(portAddress.portIndex);
+
+
+                    _activeMidiOutputPort.connect(new MidiReceiver() {
+                        @Override
+                        public void onSend(byte[] msg, int offset, int count, long timestamp) throws IOException {
+                            int status = -1;
+                            int chan = -1;
+                            int d0 = -1;
+                            int d1 = -1;
+                            if (count > 0) {
+                                status = (msg[offset] & 0b11110000);
+                                chan = (msg[offset] & 0b1111);
+                            }
+                            if (count > 1) {
+                                d0 = msg[offset+1];
+                            }
+                            if (count > 2) {
+                                d1 = msg[offset+2];
+                            }
+                            Log.i(LOG_TAG, "count: "+count+" status: "+status+" chan: "+chan + " d0: "+d0+" d1: "+d1);
+                        }
+                    });
+
+
+                }
+            }
+
+        }, new Handler(Looper.getMainLooper()));
+    }
 
     protected class MidiPortAddress {
         public int deviceIndex;
@@ -158,7 +263,8 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    protected void populateMidiDeviceSpinner(MidiDeviceInfo[] deviceList) {
+
+    protected HashMap<Integer, MidiPortAddress> populateDeviceSpinner(MidiDeviceInfo[] deviceList, int portType, Spinner spinner) {
 
         ArrayList<String> portNames = new ArrayList<String>();
         final HashMap<Integer, MidiPortAddress> portMap = new HashMap<Integer, MidiPortAddress>();
@@ -167,12 +273,12 @@ public class MainActivity extends AppCompatActivity {
         for (MidiDeviceInfo deviceInfo : deviceList) {
 
             Bundle deviceProperties = deviceInfo.getProperties();
-            String deviceName = (String)deviceProperties.get(MidiDeviceInfo.PROPERTY_NAME);
+            String deviceName = (String) deviceProperties.get(MidiDeviceInfo.PROPERTY_NAME);
 
             int portIndex = 0;
             for (MidiDeviceInfo.PortInfo portInfo : deviceInfo.getPorts()) {
-                if (portInfo.getType() == portInfo.TYPE_INPUT) {
-                    portNames.add(deviceName + ": " + portInfo.getName()  + "," + portInfo.getPortNumber());
+                if (portInfo.getType() == portType) {
+                    portNames.add(deviceName + ": " + portInfo.getName() + "," + portInfo.getPortNumber());
                     portMap.put(mapIndex++, new MidiPortAddress(deviceIndex, portIndex));
                     portIndex++; // output Port Index
                 }
@@ -180,96 +286,107 @@ public class MainActivity extends AppCompatActivity {
             deviceIndex++;
         }
 
-        final Spinner spinner = (Spinner) findViewById(R.id.midiDeviceSpinner);
-
-
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, portNames);
         spinner.setAdapter(adapter);
 
+        return portMap;
+    }
 
+    protected void populateMidiChannelSpinner(Spinner spinner) {
         ArrayAdapter<String> midiChanAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, new String[] {"1", "2","3","4","5","6","7","8","9","10","11","12","13","14","15","16"});
+        spinner.setAdapter(midiChanAdapter);
+    }
+
+    protected void populateMidiDeviceSpinner(MidiDeviceInfo[] deviceList) {
+
+        final Spinner inputDeviceSpinner = (Spinner) findViewById(R.id.midiDeviceSpinner);
+        final HashMap<Integer, MidiPortAddress> inputPortMap = populateDeviceSpinner(deviceList, MidiDeviceInfo.PortInfo.TYPE_INPUT, inputDeviceSpinner);
+
+        final Spinner outputDeviceSpinner = (Spinner) findViewById(R.id.midiOutputDeviceSpinner);
+        final HashMap<Integer, MidiPortAddress> outputPortMap = populateDeviceSpinner(deviceList, MidiDeviceInfo.PortInfo.TYPE_OUTPUT, outputDeviceSpinner);
+
         final Spinner midiChannelSpinner = (Spinner) findViewById(R.id.channelSelect);
-        midiChannelSpinner.setAdapter(midiChanAdapter);
+        populateMidiChannelSpinner(midiChannelSpinner);
 
-        TextView fullScreenText = (TextView) findViewById(R.id.fullscreen_content);
-        if (deviceList.length > 0) {
-            MidiDeviceInfo device = deviceList[0];
-            MidiDeviceInfo.PortInfo[] portInfo = device.getPorts();
-            if (portInfo.length > 0)
-            fullScreenText.setText(portInfo[0].getName());
-        }
 
-        Button openDeviceButton = (Button) findViewById(R.id.openDeviceButton);
-        openDeviceButton.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                final int portMapIndex = spinner.getSelectedItemPosition();
-                final MidiPortAddress portAddress = portMap.get(portMapIndex);
-
-                MidiManager manager = (MidiManager) getSystemService(Context.MIDI_SERVICE);
-                MidiDeviceInfo[] deviceList = manager.getDevices();
-                MidiDeviceInfo deviceInfo = deviceList[portAddress.deviceIndex];
-                manager.openDevice(deviceInfo, new MidiManager.OnDeviceOpenedListener() {
-                    @Override
-                    public void onDeviceOpened(MidiDevice device) {
-                        _activeMidiDevice = device;
-                        if (device == null) {
-                            Log.e("MarkovSeq", "could not open device " + device);
-                            _activeInputPort = null;
-                        } else {
-                            Log.i("MarkovSeq", "opened device: " + device);
-                            _activeInputPort = device.openInputPort(portAddress.portIndex);
-                        }
-                    }
-
-                }, new Handler(Looper.getMainLooper()));
+        inputDeviceSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                closeMidiInputConnection();
+                final int portMapIndex = inputDeviceSpinner.getSelectedItemPosition();
+                final MidiPortAddress portAddress = inputPortMap.get(portMapIndex);
+                openMidiInputConnection(portAddress);
             }
 
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                closeMidiInputConnection();
+            }
         });
+
+        outputDeviceSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                closeMidiOutputConnection();
+                final int portMapIndex = outputDeviceSpinner.getSelectedItemPosition();
+                final MidiPortAddress portAddress = outputPortMap.get(portMapIndex);
+                openMidiOutputConnection(portAddress);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                closeMidiOutputConnection();
+            }
+        });
+
 
         Button playNoteButton = (Button) findViewById(R.id.playNoteButton);
         playNoteButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                if (_activeInputPort != null) {
-                    byte[] buffer = new byte[32];
+                if (_activeMidiInputPort != null) {
+
                     int channel = midiChannelSpinner.getSelectedItemPosition();
-                    int offset = 0;
-                    int numBytes;
-
-
-                    // post is non-blocking
-                    try {
-
-                        // Note On
-                        numBytes = 0;
-                        buffer[numBytes++] = (byte)(0x90 + (channel)); // note on
-                        buffer[numBytes++] = (byte)60; // pitch is middle C
-                        buffer[numBytes++] = (byte)127; // max velocity
-                        _activeInputPort.send(buffer, offset, numBytes);
-
-
-                        final long NANOS_PER_SECOND = 1000000000L;
-                        long now = System.nanoTime();
-                        long future = now + (1 * NANOS_PER_SECOND);
-
-                        // Note off
-                        numBytes = 0;
-                        buffer[numBytes++] = (byte)(0x80 + (channel)); // note on
-                        buffer[numBytes++] = (byte)60; // pitch is middle C
-                        buffer[numBytes++] = (byte)0; // max velocity
-                        _activeInputPort.send(buffer, offset, numBytes, future);
-
-
-                    } catch (IOException e) {
-                        Log.e("MarkovSeq",e.toString());
-                    }
+                    playNote(channel, 200, 60);
                 }
             }
         });
 
+    }
+
+    protected void playNote(int channel, int durationMillis, int note) {
+        byte[] buffer = new byte[32];
+        int offset = 0;
+        int numBytes;
+
+        note = note % 127;
+
+        // post is non-blocking
+        try {
+
+            // Note On
+            numBytes = 0;
+            buffer[numBytes++] = (byte)(0x90 + (channel)); // note on
+            buffer[numBytes++] = (byte)note; // pitch is middle C
+            buffer[numBytes++] = (byte)127; // max velocity
+            _activeMidiInputPort.send(buffer, offset, numBytes);
 
 
+            //final long NANOS_PER_SECOND = 1000000000L;
+            final long NANOS_PER_MILLI = 1000000L;
+            long now = System.nanoTime();
+            long future = now + (durationMillis * NANOS_PER_MILLI);
+
+            // Note off
+            numBytes = 0;
+            buffer[numBytes++] = (byte)(0x80 + (channel)); // note on
+            buffer[numBytes++] = (byte)60; // pitch is middle C
+            buffer[numBytes++] = (byte)0; // max velocity
+            _activeMidiInputPort.send(buffer, offset, numBytes, future);
 
 
+        } catch (Exception e) {
+            Log.e("MarkovSeq",e.toString());
+        }
     }
 
     @Override
