@@ -58,10 +58,10 @@
         <TextView
             android:id="@+id/fullscreen_content"
             android:layout_width="100dp"
-            android:layout_height="24dp"
             android:gravity="center"
             android:keepScreenOn="true"
             android:text="@string/dummy_content"
+            android:layout_height="42dp"
             android:background="#ff3abb"
             android:textColor="#33b5e5"
             android:textSize="16sp"
@@ -70,9 +70,10 @@
         <LinearLayout
             android:id="@+id/midi_output_device_toolbar"
             style="?metaButtonBarStyle"
-            android:layout_width="match_parent"
-            android:layout_height="82dp"
-            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginLeft="100dp"
+            android:layout_width="396dp"
+            android:layout_height="42dp"
+            android:layout_gravity="top"
             android:layout_marginBottom="84dp"
             android:background="@color/black_overlay"
             android:orientation="horizontal"
@@ -80,10 +81,10 @@
             android:weightSum="1">
 
             <Spinner
-                android:layout_width="312dp"
-                android:layout_height="match_parent"
-                android:id="@+id/midiOutputDeviceSpinner"
-                android:layout_weight="0.04" />
+                android:layout_width="396dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_height="42dp"
+                android:id="@+id/midiOutputDeviceSpinner" />
 
          <!--   <Button
                 android:id="@+id/openOutputDeviceButton"

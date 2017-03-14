@@ -10,6 +10,7 @@ import android.media.midi.MidiManager;
 import android.media.midi.MidiOutputPort;
 import android.media.midi.MidiReceiver;
 import android.os.Looper;
+import android.os.Message;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -22,11 +23,14 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -106,6 +110,12 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    public Handler bpmUpdateHandler = new Handler() {
+        public void handleMessage(Message msg) {
+            ((TextView)mContentView).setText(_midiSeq.getBeatsPerMinute() + " BPM");
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -115,6 +125,15 @@ public class MainActivity extends AppCompatActivity {
         mVisible = true;
         mMidiDeviceToollbarView = findViewById(R.id.midi_device_toolbar);
         mContentView = findViewById(R.id.fullscreen_content);
+
+        _midiSeq = new MidiSequencer();
+        Timer timer = new Timer();
+        timer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                bpmUpdateHandler.obtainMessage(1).sendToTarget();
+            }
+        }, 0, 1000);
 
 
         // Set up the user interaction to manually show or hide the system UI.
@@ -128,14 +147,13 @@ public class MainActivity extends AppCompatActivity {
         Context context = getApplicationContext();
 
         if (context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_MIDI)) {
-            // do MIDI stuff
-            Toast.makeText(context, "We have MIDI", Toast.LENGTH_SHORT).show();
+
             MidiManager manager = (MidiManager) getSystemService(Context.MIDI_SERVICE);
             MidiDeviceInfo[] deviceList = manager.getDevices();
             if (deviceList.length > 0) {
-                Toast.makeText(context, "we have a device:"+deviceList[0].toString(), Toast.LENGTH_LONG ).show();
+
             } else {
-                Toast.makeText(context, "No devices", Toast.LENGTH_SHORT).show();
+
             }
             populateMidiDeviceSpinner(deviceList);
         } else {
@@ -151,6 +169,7 @@ public class MainActivity extends AppCompatActivity {
         //findViewById(R.id.openDeviceButton).setOnTouchListener(mDelayHideTouchListener);
     }
 
+    protected MidiSequencer _midiSeq;
     protected MidiDevice _activeMidiInputDevice;
     protected MidiDevice _activeMidiOutputDevice;
     protected MidiInputPort _activeMidiInputPort;
@@ -226,13 +245,17 @@ public class MainActivity extends AppCompatActivity {
                     _activeMidiOutputPort = device.openOutputPort(portAddress.portIndex);
 
 
-                    _activeMidiOutputPort.connect(new MidiReceiver() {
+                  _activeMidiOutputPort.connect(_midiSeq);
+/*                    _activeMidiOutputPort.connect(new MidiReceiver() {
                         @Override
                         public void onSend(byte[] msg, int offset, int count, long timestamp) throws IOException {
                             int status = -1;
                             int chan = -1;
                             int d0 = -1;
                             int d1 = -1;
+                            int clock = -1;
+
+
                             if (count > 0) {
                                 status = (msg[offset] & 0b11110000);
                                 chan = (msg[offset] & 0b1111);
@@ -243,9 +266,14 @@ public class MainActivity extends AppCompatActivity {
                             if (count > 2) {
                                 d1 = msg[offset+2];
                             }
+
+                            if (status >= 248) {
+                                clock = status+chan;
+                            }
+
                             Log.i(LOG_TAG, "count: "+count+" status: "+status+" chan: "+chan + " d0: "+d0+" d1: "+d1);
                         }
-                    });
+                    });*/
 
 
                 }
