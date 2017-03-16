@@ -126,7 +126,15 @@ public class MainActivity extends AppCompatActivity {
         mMidiDeviceToollbarView = findViewById(R.id.midi_device_toolbar);
         mContentView = findViewById(R.id.fullscreen_content);
 
-        _midiSeq = new MidiSequencer();
+        _midiSeq = new MidiSequencer() {
+            @Override
+            public void playNote(int pitch, int durationMillis) {
+                if (_activeMidiInputPort != null && _selectedMidiOutputChannel >= 0) {
+                    _playNote(_selectedMidiOutputChannel, durationMillis, pitch);
+                }
+            }
+        };
+
         Timer timer = new Timer();
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
@@ -174,6 +182,7 @@ public class MainActivity extends AppCompatActivity {
     protected MidiDevice _activeMidiOutputDevice;
     protected MidiInputPort _activeMidiInputPort;
     protected MidiOutputPort _activeMidiOutputPort;
+    protected int _selectedMidiOutputChannel;
 
     protected void closeMidiInputConnection() {
         if (_activeMidiInputPort != null) {
@@ -367,21 +376,34 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        midiChannelSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                _selectedMidiOutputChannel = midiChannelSpinner.getSelectedItemPosition();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                _selectedMidiOutputChannel = -1;
+            }
+        });
+
 
         Button playNoteButton = (Button) findViewById(R.id.playNoteButton);
         playNoteButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                if (_activeMidiInputPort != null) {
+                if (_activeMidiInputPort != null && _selectedMidiOutputChannel >= 0) {
 
-                    int channel = midiChannelSpinner.getSelectedItemPosition();
-                    playNote(channel, 200, 60);
+
+                    _playNote(_selectedMidiOutputChannel, 200, 60);
                 }
             }
         });
 
     }
 
-    protected void playNote(int channel, int durationMillis, int note) {
+    protected void _playNote(int channel, int durationMillis, int note) {
+        Log.i(LOG_TAG, "play note: channel="+channel+ " note="+note+" dur="+durationMillis);
         byte[] buffer = new byte[32];
         int offset = 0;
         int numBytes;
@@ -394,8 +416,8 @@ public class MainActivity extends AppCompatActivity {
             // Note On
             numBytes = 0;
             buffer[numBytes++] = (byte)(0x90 + (channel)); // note on
-            buffer[numBytes++] = (byte)note; // pitch is middle C
-            buffer[numBytes++] = (byte)127; // max velocity
+            buffer[numBytes++] = (byte)note; // pitch
+            buffer[numBytes++] = (byte)127; //  velocity
             _activeMidiInputPort.send(buffer, offset, numBytes);
 
 
@@ -406,9 +428,9 @@ public class MainActivity extends AppCompatActivity {
 
             // Note off
             numBytes = 0;
-            buffer[numBytes++] = (byte)(0x80 + (channel)); // note on
-            buffer[numBytes++] = (byte)60; // pitch is middle C
-            buffer[numBytes++] = (byte)0; // max velocity
+            buffer[numBytes++] = (byte)(0x80 + (channel)); // note off
+            buffer[numBytes++] = (byte)note;
+            buffer[numBytes++] = (byte)0;
             _activeMidiInputPort.send(buffer, offset, numBytes, future);
 
 

@@ -3,15 +3,16 @@ package com.ianzieg.markovseq;
 import android.media.midi.MidiReceiver;
 import android.util.Log;
 import java.io.IOException;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.math.BigDecimal;
 
-/**
- * Created by Ian on 3/12/17.
- */
 
-public class MidiSequencer extends MidiReceiver {
+
+
+public abstract class MidiSequencer extends MidiReceiver {
 
     public static final String LOG_TAG = "MIDI SEQ";
 
@@ -40,6 +41,9 @@ public class MidiSequencer extends MidiReceiver {
     protected long _lastClockTimestamp = 0;
     protected long _clockTickDuration = 0;
     protected ArrayList<Long> _recentClockDurations = new ArrayList<Long>();
+
+
+    public abstract void playNote(int pitch, int durationMillis);
 
     /***
      * http://www.midimountain.com/midi/midi_status.htm
@@ -108,29 +112,53 @@ public class MidiSequencer extends MidiReceiver {
 
     protected static final int CLOCK_HISTORY = 24;
 
+    //protected int _noteCounter = 0;
+
     protected void handleClockTick(long timestamp) {
         //long now = System.nanoTime();
-        long now = timestamp;
-        long deltLastTick = now - _lastClockTimestamp;
-        _clockTickDuration = deltLastTick;
-        _lastClockTimestamp = now;
+        if (_clockCounter % 2 == 0) {
+            long now = timestamp;
+            long deltLastTick = now - _lastClockTimestamp;
+            _clockTickDuration = deltLastTick;
+            _lastClockTimestamp = now;
 
-        _recentClockDurations.add(deltLastTick);
 
-        if (_recentClockDurations.size() > CLOCK_HISTORY) {
-            _recentClockDurations = new ArrayList<Long>(_recentClockDurations.subList(_recentClockDurations.size()-CLOCK_HISTORY, CLOCK_HISTORY));
-/*            Collections.sort(_recentClockDurations);
-            _recentClockDurations = new ArrayList<Long>(_recentClockDurations.subList(0, 22));
-            Collections.reverse(_recentClockDurations);
-            _recentClockDurations =  new ArrayList<Long>(_recentClockDurations.subList(0, 20));*/
+            _recentClockDurations.add(deltLastTick);
+
+            if (_recentClockDurations.size() > CLOCK_HISTORY) {
+                 //_recentClockDurations = new ArrayList<Long>(_recentClockDurations.subList(_recentClockDurations.size() - CLOCK_HISTORY, CLOCK_HISTORY));
+                Collections.sort(_recentClockDurations);
+                _recentClockDurations = new ArrayList<Long>(_recentClockDurations.subList(0, 22));
+                Collections.reverse(_recentClockDurations);
+                _recentClockDurations =  new ArrayList<Long>(_recentClockDurations.subList(0, 20));
+            }
+
+            if (_clockCounter % CLOCK_PER_QUANT == 0) {
+                int duration = getAverageTickMillis() * CLOCK_PER_QUANT / 8;
+                int pitch = (int) (50L + ((_clockCounter / CLOCK_PER_QUANT) % 12L));
+                playNote(pitch, duration);
+                Log.i(LOG_TAG, "Clock Tick: duration="+deltLastTick+" bpm="+getBeatsPerMinute() +" pitch="+pitch+" dur="+duration);
+            }
         }
 
         _clockCounter++;
 
-        if (_clockCounter % CLOCK_PER_QUANT == 0) {
-            Log.i(LOG_TAG, "Clock Tick: duration="+deltLastTick+" bpm="+getBeatsPerMinute());
-        }
+
       //  Log.i(LOG_TAG, "Clock Tick: "+getBeatsPerMinute()+"bpm @ "+timestamp);
+    }
+
+    public int getAverageTickMillis() {
+        double _avgClockTick = 1;
+        ArrayList<Long> clockDurs = new ArrayList<Long>(_recentClockDurations.subList(0, _recentClockDurations.size()));
+
+        if (clockDurs.size() > 0) {
+            for (long tickDur : clockDurs) {
+                _avgClockTick += (double) tickDur;
+            }
+            _avgClockTick = _avgClockTick / clockDurs.size();
+        }
+
+        return (int) (_avgClockTick*2)/1000000;
     }
 
     public double getBeatsPerMinute() {
@@ -145,17 +173,19 @@ public class MidiSequencer extends MidiReceiver {
             clockDurs =  new ArrayList<Long>(clockDurs.subList(0, CLOCK_HISTORY - CLOCK_HISTORY/4));
         }*/
 
-        for (long tickDur : clockDurs) {
-            _avgClockTick += (double)tickDur;
+        double bpm;
+        if (clockDurs.size() > 0) {
+            for (long tickDur : clockDurs) {
+                _avgClockTick += (double) tickDur;
+            }
+            _avgClockTick = _avgClockTick / clockDurs.size();
+            bpm = (1 / (_avgClockTick / NANOS_PER_SEC) / 24) * 60;
+        } else {
+            bpm = 0;
         }
-        _avgClockTick = _avgClockTick / clockDurs.size();
 
-
-
-        //return 60.0 / ((_avgClockTick / (double)NANOS_PER_SEC) * CLOCK_PER_QUANT);
-        //return _avgClockTick / 1000000000.0;
-        //return (1000 / (_avgClockTick / 1000000.0) / 24) * 60;
-        return (1 / (_avgClockTick / NANOS_PER_SEC) / 24) * 60;
+        bpm = (new BigDecimal(bpm)).setScale(1, RoundingMode.HALF_UP).doubleValue();
+        return bpm *2;
 
     }
 
